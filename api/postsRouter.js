@@ -21,7 +21,8 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    const newPost = await Post.insert(req.body);
+    const newId = await Post.insert(req.body);
+    const newPost = await Post.findById(newId.id);
     res.status(201).json(newPost);
   } catch {
     res.status(500).json({
@@ -58,7 +59,8 @@ router.put("/:id", async (req, res) => {
   try {
     const updatedPost = await Post.update(id, req.body);
     if (updatedPost) {
-      res.status(200).json(updatedPost);
+      const update = await Post.findById(id);
+      res.status(200).json(update);
     } else {
       res
         .status(404)
@@ -72,10 +74,12 @@ router.put("/:id", async (req, res) => {
 });
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
+
   try {
-    const deletedPost = await Post.delete(id);
+    const deletedPostById = await Post.findById(id);
+    const deletedPost = await Post.remove(id);
     if (deletedPost) {
-      res.status(200).json({ message: "The post was removed" });
+      res.status(200).json(deletedPostById);
     } else {
       res
         .status(404)
@@ -90,7 +94,7 @@ router.get("/:id/comments", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const comment = await Post.findCommentById(id);
+    const comment = await Post.findPostComments(id);
     if (comment) {
       res.status(200).json(comment);
     } else {
@@ -104,11 +108,31 @@ router.get("/:id/comments", async (req, res) => {
       .json({ error: "The comments information could not be retrieved." });
   }
 });
-router.post("/:id/comments", (req, res) => {
+router.post("/:id/comments", async (req, res) => {
+  const { id } = req.params;
+
   if (!req.body.text) {
     res
       .status(400)
       .json({ errorMessage: "Please provide text for the comment." });
+  }
+
+  try {
+    const post = await Post.findById(id);
+    if (!post) {
+      res
+        .status(404)
+        .json({ message: "The post with the specified ID does not exist." });
+    } else {
+      const newId = await Post.insertComment({ ...req.body, post_id: id });
+      const comment = await Post.findCommentById(newId.id);
+      res.status(201).json(comment);
+    }
+  } catch (err) {
+    res.status(500).json({
+      error: "There was an error while saving the comment to the database",
+      message: err.message,
+    });
   }
 });
 
